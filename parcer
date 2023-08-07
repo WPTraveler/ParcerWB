@@ -1,0 +1,333 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+
+#%% 
+# подключаем системные зависимости 
+import selenium, time, os, requests, re; 
+import pandas as pd; 
+from PIL import Image; 
+import matplotlib.pyplot as plt; 
+from selenium import webdriver; 
+from selenium.webdriver.common.keys import Keys;
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+# указываем путь до драйвера браузера 
+PATH = "C:\Program Files\Google\Chrome\Application\chromedriver";
+# создаем экземпляр драйвера 
+driver = webdriver.Chrome(PATH); 
+# целевой сайт 
+WB = "https://https://www.wildberries.ru/";
+# загружаем сайт 
+driver.get(WB); 
+# ожидаем появление элемента меню ссылок 
+try:
+    main = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "j-menu-burger-main"))); 
+except:
+    driver.quit(); 
+# выгрузка всех базовых ссылок 
+items = main.find_elements(by=By.CLASS_NAME, value="j-menu-main-item [href]"); 
+links = [elem.get_attribute('href') for elem in items];
+headers = [elem.get_attribute('text') for elem in items];
+
+# печать базовых ссылок и названий разделов 
+print(links,"\n");
+print(headers,"\n");
+
+# выборка информации о всех разделах категории 
+driver.get(links[10]); 
+time.sleep(1); 
+_18_years = driver.find_elements(by=By.CLASS_NAME, value="popup__btn-main.j-confirm"); 
+if(len(_18_years) > 0): 
+    _18_years[0].click(); 
+    time.sleep(1); 
+    driver.refresh(); 
+    time.sleep(1); 
+# ожидаем появление элемента меню ссылок 
+try:
+    main = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "menu-catalog__list-2.maincatalog-list-2"))); 
+except:
+    driver.quit(); 
+# выгрузка всех базовых ссылок 
+items = main.find_elements(by=By.CLASS_NAME, value="j-menu-item"); 
+links = [elem.get_attribute('href') for elem in items];
+headers = [elem.get_attribute('text') for elem in items];
+
+# 
+print(links,"\n");
+print(headers,"\n");
+
+# выборка информации из карточек на странице 
+driver.get("https://www.wildberries.ru/catalog/"); 
+# ожидаем появление элемента меню ссылок 
+try:
+    main = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "product-card-list"))); 
+except:
+    driver.quit(); 
+# контейнер для хранения данных карточек 
+parsedData = []; 
+# 1) --------------------------------------------------------------------------
+# выгрузка всех базовых ссылок 
+
+items = main.find_elements(by=By.CLASS_NAME, value="product-card"); 
+print(len(items));
+nextPageExists = True;
+while(nextPageExists == True): 
+    time.sleep(1); 
+    next_page_link = driver.find_elements(by=By.LINK_TEXT, value="Следующая страница")[0].get_attribute("href"); 
+    print("next_page_link=",next_page_link); 
+    cur_url = driver.current_url; 
+    # перебор элементов в цикле 
+    for item in items:
+        # 1) идентификация встроенной рекламы в карточке 
+        try:
+            reklama = item.find_element(by=By.CLASS_NAME,value="product-card__tip-promo").text;
+        except Exception as e: 
+            reklama = 0; print("ERROR reklama");
+        # 2) идентификация тега "черной пятницы" 
+        try: 
+            blackFriday = item.find_element(by=By.CLASS_NAME,value="spec-action__text").text;
+        except Exception as e: 
+            blackFriday = 0; print("ERROR blackFriday");
+        # 3) идентификация метки "новый товар"
+        try:
+            newTowar = item.find_element(by=By.CLASS_NAME,value="product-card__tip-new").text;
+        except Exception as e: 
+            newTowar = 0; print("ERROR newTowar");
+        # 4) идентификация наименования продавца 
+        try:
+            brand_name = item.find_element(by=By.CLASS_NAME,value="brand-name").text; 
+        except Exception as e: 
+            brand_name = "None"; print("ERROR brand_name");
+        # 5) идентификация наименования товара 
+        try:
+            goods_name = item.find_element(by=By.CLASS_NAME,value="goods-name").text; 
+        except Exception as e: 
+            goods_name = "None"; print("ERROR goods_name");
+        # 6) идентификация актуальной стоимости товара 
+        try:
+            lower_price = item.find_element(by=By.CLASS_NAME,value="lower-price").text; 
+            lower_price = re.sub(r'[^\d,.]', '', lower_price); 
+        except Exception as e: 
+            lower_price = 0; print("ERROR lower_price");
+        # 7) идентификация старой стоимости товара 
+        try:
+            price_old_block = item.find_element(by=By.CLASS_NAME,value="price-old-block").text; 
+            price_old_block = re.sub(r'[^\d,.]', '', price_old_block); 
+        except Exception as e: 
+            price_old_block = 0; print("ERROR price_old_block");
+        # 8) идентификация объема скидки 
+        try:
+            product_card_sale = item.find_element(by=By.CLASS_NAME,value="product-card__sale").text;
+        except Exception as e: 
+            product_card_sale = "0"; print("ERROR product_card_sale");
+        # 9) идентификация количества отзывов на товар 
+        try:
+            product_card_count = item.find_element(by=By.CLASS_NAME,value="product-card__count").text;
+        except Exception as e: 
+            product_card_count = 0; print("ERROR product_card_count");
+        # 10) идентификация даты доставки 
+        try: 
+            product_card_delivery_date = item.find_element(by=By.CLASS_NAME,value="product-card__delivery-date").text; 
+        except Exception as e: 
+            product_card_delivery_date = 0; print("ERROR product_card_delivery_date");
+        # 11) идентификация URL изображения карточки 
+        try: 
+            product_card_img_url = item.find_element(by=By.CLASS_NAME,value="j-thumbnail.thumbnail").get_attribute("src"); 
+        except Exception as e: 
+            product_card_img_url = "0"; print("ERROR product_card_img_url");
+        # идентификация метки "весна-лето"
+        try: 
+            spec_action_text = item.find_element(by=By.CLASS_NAME,value="spec-action__text").text; 
+        except Exception as e: 
+            spec_action_text = 0; print("ERROR spec_action_text");
+        # после того как с карточки данные собраны - переходим на страницу товара 
+        try: 
+            if(item is not None):
+                item.click(); time.sleep(1);
+        except Exception as e: 
+            print("ERROR item.click()");
+        # идентификация поля артикула товара 
+        try: 
+            article = driver.find_element(by=By.ID,value="productNmId").text;
+        except Exception as e: 
+            article = 0; print("ERROR article");
+        # идентификация поля количества купленного товара 
+        try: 
+            buyer_count = driver.find_element(by=By.CLASS_NAME,value="product-order-quantity.j-orders-count-wrapper").text;
+            buyer_count = re.sub(r'[^\d,.]', '', buyer_count);
+        except Exception as e: 
+            buyer_count = 0; print("ERROR buyer_count");
+        # идентификация истории цены товара
+        try: 
+            price_from_to = driver.find_element(by=By.CLASS_NAME,value="price-history__text.hide-mobile").text;
+            price_from_to = price_from_to.split("до");
+            if(len(price_from_to) == 1):
+                price_from_to[0] = re.sub(r'[^\d,.]', '', price_from_to[0]);
+            elif(len(price_from_to) == 2):
+               price_from_to[0] = re.sub(r'[^\d,.]', '', price_from_to[0]);
+               price_from_to[1] = re.sub(r'[^\d,.]', '', price_from_to[1]);
+            price_from_to = ";".join(price_from_to); 
+        except Exception as e: 
+            price_from_to = 0; print("ERROR price_from_to");
+        # идентификация рейтинга продавца
+        try: 
+            seller_rating = driver.find_element(by=By.XPATH,value="//span[@class='address-rate-mini']").text;
+        except Exception as e: 
+            seller_rating = 0; print("ERROR seller_rating");
+        # идентификация о количестве отзывов на продавца
+        try: 
+            seller_info = driver.find_element(by=By.CLASS_NAME,value="seller-info__review").text; 
+            seller_info = re.sub(r'[^\d,.]', '', seller_info); 
+        except Exception as e: 
+            seller_info = 0; print("ERROR seller_info");
+        # идентификация общего количества проданных товаров продавца
+        try: 
+            seller_sum_count = driver.find_element(by=By.CLASS_NAME,value="seller-info__item.seller-info__item--delivered").text; 
+            seller_sum_count = re.sub(r'[^\d,.]', '', seller_sum_count); 
+        except Exception as e: 
+            seller_sum_count = 0; print("ERROR seller_sum_count");
+        # идентификация времени работы с WB 
+        try: 
+            seller_work_time = driver.find_element(by=By.CLASS_NAME,value="seller-info__item.seller-info__item--time").text; 
+        except Exception as e: 
+            seller_work_time = 0; print("ERROR seller_work_time");
+        # идентификация процентов товара с браком 
+        try: 
+            seller_defect_count = driver.find_element(by=By.CLASS_NAME,value="seller-info__item.seller-info__item--defective").text; 
+        except Exception as e: 
+            seller_defect_count = 0; print("ERROR seller_defect_count");
+        # идентификация ссылки на магазин продавца 
+        try: 
+            seller_href = driver.find_element(by=By.CLASS_NAME,value="seller-info__link.hide-desktop").get_attribute("href"); 
+        except Exception as e: 
+            seller_href = "0"; print("ERROR seller_href");
+        # ссылка на карточку товара 
+        card_wear_link = driver.current_url; 
+        # 
+        time.sleep(1); driver.back(); 
+        # 
+        buf = [brand_name, goods_name, lower_price, price_old_block, product_card_sale, 
+               product_card_count, product_card_delivery_date, product_card_img_url, 
+               spec_action_text, bool(reklama), bool(blackFriday), bool(newTowar), 
+               article, buyer_count, price_from_to, seller_rating, seller_info, 
+               seller_sum_count, seller_work_time, seller_defect_count, seller_href, card_wear_link
+               ]; 
+        parsedData.append(buf); print(buf); time.sleep(1); 
+        # 
+    print("Страница завершена");
+    # 
+    try:
+        if(len(next_page_link) > 0):
+            nextPageExists = True; 
+            driver.get(nextPageExists); 
+            time.sleep(1); 
+        else:
+            driver.quit(); 
+        try:
+            main = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "product-card-list"))); 
+        except:
+            driver.quit(); 
+        time.sleep(1); 
+        items = main.find_elements(by=By.CLASS_NAME, value="product-card"); 
+    except Exception as e: 
+        nextPageExists = False; print("ERROR next_page_link");
+
+parsedDataDF = pd.DataFrame(data=parsedData,columns=["Наименование продавца", "Наименование товара", 
+                                                     "Актуальная цена", "Прошлая цена", "Величина скидки", 
+                                                     "Количество отзывов", "Дата доставки", "Изображение товара", 
+                                                     "Награда", "Реклама", "Черная пятница", "Новый товар",
+                                                     "Артикул", "Продано", "Начальная Конечная цена", 
+                                                     "Рейтинг продавца", "Общее кол-во отзывов", "Общее кол-во проданных товаров",
+                                                     "Время работы с WB", "Кол-во дефектных товаров", "Ссылка на продавца", 
+                                                     "Ссылка на карточку товара" 
+                                                     ]);
+parsedDataDF.to_excel("Potap_vibrators.xlsx");
+
+time.sleep(5);
+
+driver.quit(); 
+
+#%% 
+
+sellers = parsedDataDF.groupby("Наименование продавца")
+
+
+import numpy as np
+import pandas as pd
+from os import path
+from PIL import Image
+from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
+
+# статистика количества товаров каждого продавца в категории товаров 
+plt.figure(figsize=(100,20));
+sellers.size().sort_values(ascending=False).plot.bar();
+plt.xticks(rotation=90);
+plt.xlabel("Продавцы Wildberrys");
+plt.ylabel("Количество товаров в категории");
+plt.show(); 
+
+# статистика максимальной стоимости товаров каждого продавца в категории 
+plt.figure(figsize=(100,20));
+sellers.max().sort_values(by="Актуальная цена",ascending=False)["Актуальная цена"].plot.bar()
+plt.xticks(rotation=90);
+plt.xlabel("Продавцы Wildberrys");
+plt.ylabel("Стоимость товаров");
+plt.show(); 
+
+
+# numItems = 1;
+# # извлекаемые параметры карточки:
+# # 1) наименование бренда (продавец)
+# print("Наименование бренда (продавец) ->", items[numItems].find_element(by=By.CLASS_NAME,value="brand-name").text); 
+# # 2) наименование товара
+# print("Наименование товара ->", items[numItems].find_element(by=By.CLASS_NAME,value="goods-name").text); 
+# # 3) стоимость текущая
+# print("Стоимость текущая ->", items[numItems].find_element(by=By.CLASS_NAME,value="lower-price").text); 
+# # 4) стоимость прошлая
+# print("Стоимость прошлая ->", items[numItems].find_element(by=By.CLASS_NAME,value="price-old-block").text); 
+# # 5) количество звезд
+# # product-card__rating stars-line star4
+# # 6) количество отзывов
+# print("Количество отзывов ->", items[numItems].find_element(by=By.CLASS_NAME,value="product-card__count").text); 
+# # 7) дата доставки 
+# print("Дата доставки ->", items[numItems].find_element(by=By.CLASS_NAME,value="product-card__delivery-date").text); 
+# # 8) изображение карточки 
+# # plt.imshow(items[0].find_element(by=By.CLASS_NAME,value="product-card__img-wrap.img-plug.j-thumbnail-wrap").get_attribute("src")); 
+# plt.imshow(Image.open(requests.get(items[numItems].find_element(by=By.CLASS_NAME,value="j-thumbnail.thumbnail").get_attribute("src"), stream=True).raw)); 
+# print("Изображение карточки ->", items[numItems].find_element(by=By.CLASS_NAME,value="j-thumbnail.thumbnail").get_attribute("src")); 
+# # 9) величина скидки 
+# print("Величина скидки ->", items[numItems].find_element(by=By.CLASS_NAME,value="product-card__sale").text); 
+# # 10) наличие встроенной рекламы (bool) 
+# try:
+#     result = items[numItems].find_element(by=By.CLASS_NAME,value="product-card__tip-promo").text;
+# except Exception as e: 
+#     result = ""; 
+# print("Наличие рекламы ->", bool(result)); 
+# # 11) наличие черной пятницы  (bool) 
+# try:
+#     result = items[numItems].find_element(by=By.CLASS_NAME,value="spec-action__text").text;
+# except Exception as e: 
+#     result = ""; 
+# print("Черная пятница ->", bool(result)); 
+# # 12) новый товар (new) (bool) 
+# try:
+#     result = items[numItems].find_element(by=By.CLASS_NAME,value="product-card__tip-new").text;
+# except Exception as e: 
+#     result = ""; 
+# print("Новый товар ->", bool(result)); 
+
+# links = [elem.get_attribute('href') for elem in items];
+# headers = [elem.get_attribute('text') for elem in items];
+
+# print("Next page ->", driver.find_elements(by=By.CLASS_NAME, value="pager-bottom")); 
+# next_page_link = driver.find_elements(by=By.LINK_TEXT, value="Следующая страница"); 
+# print("Next page ->", next_page_link); 
+# next_page_link[0].click(); 
+
+# 1) menu-catalog__list-2 maincatalog-list-2
+# 2) banners-catalog__item j-banner-wrapper
+
+
